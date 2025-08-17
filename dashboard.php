@@ -78,7 +78,7 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Sistem Kas KAS Rauang GeLATIK</title>
+    <title>Dashboard - Sistem KAS Ruang Gelatik</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

@@ -126,7 +126,7 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan - Sistem Kas Rumah Sakit</title>
+    <title>Laporan - Sistem KAS Ruang Gelatik</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -141,7 +141,7 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
                         <i class="fas fa-hospital text-blue-600 text-2xl"></i>
                     </div>
                     <div class="ml-3">
-                        <h1 class="text-xl font-bold text-gray-800">KAS RUMKIT</h1>
+                        <h1 class="text-xl font-bold text-gray-800">KAS Ruang Gelatik</h1>
                     </div>
                 </div>
                 
@@ -256,6 +256,12 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
                         <a href="laporan.php" 
                            class="ml-3 px-6 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-200">
                             <i class="fas fa-refresh mr-2"></i>Reset
+                        </a>
+                        
+                        <!-- Export Excel Button -->
+                        <a href="export_excel.php?<?php echo http_build_query($_GET); ?>" 
+                           class="ml-3 px-6 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300 transition duration-200">
+                            <i class="fas fa-file-excel mr-2"></i>Export Excel
                         </a>
                     </div>
                 </form>

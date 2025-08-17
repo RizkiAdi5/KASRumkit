@@ -216,31 +216,3 @@ function getMonthName($month) {
         </div>
     <?php endif; ?>
 </div>
-
-<!-- Export Options -->
-<?php if(!empty($payments)): ?>
-<div class="text-center">
-    <div class="inline-flex space-x-3">
-        <button onclick="exportToPDF(<?php echo $employee_id; ?>)" 
-                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200">
-            <i class="fas fa-file-pdf mr-2"></i>Export PDF
-        </button>
-        <button onclick="exportToExcel(<?php echo $employee_id; ?>)" 
-                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200">
-            <i class="fas fa-file-excel mr-2"></i>Export Excel
-        </button>
-    </div>
-</div>
-<?php endif; ?>
-
-<script>
-function exportToPDF(employeeId) {
-    // TODO: Implement PDF export
-    alert('Fitur export PDF akan segera tersedia!');
-}
-
-function exportToExcel(employeeId) {
-    // TODO: Implement Excel export
-    alert('Fitur export Excel akan segera tersedia!');
-}
-</script> 

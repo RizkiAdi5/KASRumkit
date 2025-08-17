@@ -52,7 +52,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sistem Kas Rumah Sakit</title>
+    <title>Login - Sistem KAS Ruang Gelatik</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -62,8 +62,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div class="mx-auto w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mb-4">
                 <i class="fas fa-hospital text-white text-3xl"></i>
             </div>
-            <h1 class="text-3xl font-bold text-gray-800">KAS RUMKIT</h1>
-            <p class="text-gray-600 mt-2">Sistem Pengaturan Kas Rumah Sakit</p>
+            <h1 class="text-3xl font-bold text-gray-800">KAS Ruang Gelatik</h1>
+            <p class="text-gray-600 mt-2">Sistem Pengaturan KAS Ruang Gelatik</p>
         </div>
 
         <?php if($error): ?>

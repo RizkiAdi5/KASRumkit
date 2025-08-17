@@ -143,7 +143,7 @@ $categories = $stmt_categories->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kategori - Sistem Kas Rumah Sakit</title>
+    <title>Kategori - Sistem KAS Ruang Gelatik</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -157,7 +157,7 @@ $categories = $stmt_categories->fetchAll(PDO::FETCH_ASSOC);
                         <i class="fas fa-hospital text-blue-600 text-2xl"></i>
                     </div>
                     <div class="ml-3">
-                        <h1 class="text-xl font-bold text-gray-800">KAS RUMKIT</h1>
+                        <h1 class="text-xl font-bold text-gray-800">KAS Ruang Gelatik</h1>
                     </div>
                 </div>
                 
