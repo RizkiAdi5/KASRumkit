@@ -159,11 +159,24 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get users
-$query_users = "SELECT * FROM users ORDER BY created_at DESC";
+// Get users with pagination
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = 10; // Limit 10 item per halaman
+$offset = ($page - 1) * $limit;
+
+$query_users = "SELECT * FROM users ORDER BY created_at DESC LIMIT :limit OFFSET :offset";
 $stmt_users = $db->prepare($query_users);
+$stmt_users->bindParam(":limit", $limit, PDO::PARAM_INT);
+$stmt_users->bindParam(":offset", $offset, PDO::PARAM_INT);
 $stmt_users->execute();
 $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
+
+// Get total count for pagination
+$query_count = "SELECT COUNT(*) as total FROM users";
+$stmt_count = $db->prepare($query_count);
+$stmt_count->execute();
+$total_users = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
+$total_pages = ceil($total_users / $limit);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -307,7 +320,7 @@ $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
                             <option value="">Pilih Role</option>
                             <option value="admin">Admin</option>
                             <option value="supervisor">Supervisor</option>
-                            <option value="kasir">Kasir</option>
+                            <option value="Pegawai">Pegawai</option>
                         </select>
                     </div>
                     
@@ -402,6 +415,40 @@ $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Pagination -->
+                <?php if($total_pages > 1): ?>
+                    <div class="px-6 py-4 border-t border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-gray-700">
+                                Menampilkan <?php echo $offset + 1; ?> - <?php echo min($offset + $limit, $total_users); ?> 
+                                dari <?php echo $total_users; ?> pengguna
+                            </div>
+                            <div class="flex space-x-2">
+                                <?php if($page > 1): ?>
+                                    <a href="?page=<?php echo $page - 1; ?>" 
+                                       class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                                        Previous
+                                    </a>
+                                <?php endif; ?>
+                                
+                                <?php for($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                                    <a href="?page=<?php echo $i; ?>" 
+                                       class="px-3 py-2 text-sm font-medium <?php echo $i === $page ? 'text-blue-600 bg-blue-50 border-blue-500' : 'text-gray-500 bg-white border-gray-300'; ?> border rounded-md hover:bg-gray-50">
+                                        <?php echo $i; ?>
+                                    </a>
+                                <?php endfor; ?>
+                                
+                                <?php if($page < $total_pages): ?>
+                                    <a href="?page=<?php echo $page + 1; ?>" 
+                                       class="px-2 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                                        Next
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -433,7 +480,7 @@ $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <option value="admin">Admin</option>
                             <option value="supervisor">Supervisor</option>
-                            <option value="kasir">Kasir</option>
+                            <option value="Pegawai">Pegawai</option>
                         </select>
                     </div>
                     

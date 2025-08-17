@@ -106,7 +106,7 @@ $employees = $stmt_employees->fetchAll(PDO::FETCH_ASSOC);
 
 // Get transactions with pagination
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 20;
+$limit = 10; // Ubah limit menjadi 10
 $offset = ($page - 1) * $limit;
 
 $query_transactions = "SELECT 

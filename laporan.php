@@ -52,7 +52,11 @@ if($tipe) {
 
 $where_clause = !empty($where_conditions) ? "WHERE " . implode(" AND ", $where_conditions) : "";
 
-// Get transactions for report
+// Get transactions for report with pagination
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = 10; // Limit 10 item per halaman
+$offset = ($page - 1) * $limit;
+
 $query_transactions = "SELECT 
     t.nomor_transaksi,
     t.tanggal_transaksi,
@@ -65,14 +69,31 @@ FROM transaksi_kas t
 JOIN kategori_transaksi k ON t.kategori_id = k.id
 JOIN users u ON t.user_id = u.id
 $where_clause
-ORDER BY t.tanggal_transaksi DESC, t.created_at DESC";
+ORDER BY t.tanggal_transaksi DESC, t.created_at DESC
+LIMIT :limit OFFSET :offset";
 
 $stmt_transactions = $db->prepare($query_transactions);
 foreach($params as $key => $value) {
     $stmt_transactions->bindValue($key, $value);
 }
+$stmt_transactions->bindParam(":limit", $limit, PDO::PARAM_INT);
+$stmt_transactions->bindParam(":offset", $offset, PDO::PARAM_INT);
 $stmt_transactions->execute();
 $transactions = $stmt_transactions->fetchAll(PDO::FETCH_ASSOC);
+
+// Get total count for pagination
+$query_count = "SELECT COUNT(*) as total FROM transaksi_kas t
+JOIN kategori_transaksi k ON t.kategori_id = k.id
+JOIN users u ON t.user_id = u.id
+$where_clause";
+
+$stmt_count = $db->prepare($query_count);
+foreach($params as $key => $value) {
+    $stmt_count->bindValue($key, $value);
+}
+$stmt_count->execute();
+$total_transactions = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
+$total_pages = ceil($total_transactions / $limit);
 
 // Calculate summary
 $total_pemasukan = 0;
@@ -394,6 +415,40 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Pagination -->
+                <?php if($total_pages > 1): ?>
+                    <div class="px-6 py-4 border-t border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-gray-700">
+                                Menampilkan <?php echo $offset + 1; ?> - <?php echo min($offset + $limit, $total_transactions); ?> 
+                                dari <?php echo $total_transactions; ?> transaksi
+                            </div>
+                            <div class="flex space-x-2">
+                                <?php if($page > 1): ?>
+                                    <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])); ?>" 
+                                       class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                                        Previous
+                                    </a>
+                                <?php endif; ?>
+                                
+                                <?php for($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                                    <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])); ?>" 
+                                       class="px-3 py-2 text-sm font-medium <?php echo $i === $page ? 'text-blue-600 bg-blue-50 border-blue-500' : 'text-gray-500 bg-white border-gray-300'; ?> border rounded-md hover:bg-gray-50">
+                                        <?php echo $i; ?>
+                                    </a>
+                                <?php endfor; ?>
+                                
+                                <?php if($page < $total_pages): ?>
+                                    <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])); ?>" 
+                                       class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                                        Next
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
