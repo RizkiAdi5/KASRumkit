@@ -222,6 +222,10 @@ $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
                         <i class="fas fa-tags mr-3"></i>
                         Kategori
                     </a>
+                    <a href="pegawai.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
+                        <i class="fas fa-user-tie mr-3"></i>
+                        Pegawai
+                    </a>
                     <a href="users.php" class="flex items-center px-4 py-3 text-blue-600 bg-blue-50 rounded-lg">
                         <i class="fas fa-users mr-3"></i>
                         Pengguna

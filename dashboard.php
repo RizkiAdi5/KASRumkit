@@ -56,9 +56,11 @@ $query_recent = "SELECT
     t.jumlah,
     t.keterangan,
     k.nama_kategori,
+    p.nama_lengkap as pegawai_nama,
     u.nama_lengkap as user_name
 FROM transaksi_kas t
 JOIN kategori_transaksi k ON t.kategori_id = k.id
+LEFT JOIN pegawai p ON t.pegawai_id = p.id
 JOIN users u ON t.user_id = u.id
 ORDER BY t.created_at DESC
 LIMIT 10";
@@ -76,7 +78,7 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Sistem Kas Rumah Sakit</title>
+    <title>Dashboard - Sistem Kas KAS Rauang GeLATIK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -91,7 +93,7 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
                         <i class="fas fa-hospital text-blue-600 text-2xl"></i>
                     </div>
                     <div class="ml-3">
-                        <h1 class="text-xl font-bold text-gray-800">KAS RUMKIT</h1>
+                        <h1 class="text-xl font-bold text-gray-800">KAS Ruang Gelatik</h1>
                     </div>
                 </div>
                 
@@ -129,6 +131,10 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
                     <a href="kategori.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
                         <i class="fas fa-tags mr-3"></i>
                         Kategori
+                    </a>
+                    <a href="pegawai.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
+                        <i class="fas fa-user-tie mr-3"></i>
+                        Pegawai
                     </a>
                     <?php if($user['role'] === 'admin'): ?>
                     <a href="users.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
@@ -218,6 +224,7 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. Transaksi</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pegawai</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
@@ -226,7 +233,7 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
                         <tbody class="bg-white divide-y divide-gray-200">
                             <?php if(empty($recent_transactions)): ?>
                                 <tr>
-                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">Belum ada transaksi</td>
+                                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">Belum ada transaksi</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach($recent_transactions as $transaction): ?>
@@ -239,6 +246,9 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             <?php echo htmlspecialchars($transaction['nama_kategori']); ?>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <?php echo $transaction['pegawai_nama'] ? htmlspecialchars($transaction['pegawai_nama']) : '-'; ?>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 

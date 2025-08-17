@@ -179,6 +179,10 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
                         <i class="fas fa-tags mr-3"></i>
                         Kategori
                     </a>
+                    <a href="pegawai.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
+                        <i class="fas fa-user-tie mr-3"></i>
+                        Pegawai
+                    </a>
                     <?php if($user['role'] === 'admin'): ?>
                     <a href="users.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
                         <i class="fas fa-users mr-3"></i>

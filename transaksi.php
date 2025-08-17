@@ -22,6 +22,11 @@ $user = [
 $message = '';
 $error = '';
 
+
+
+
+
+
 // Handle form submission
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     if(isset($_POST['action'])) {
@@ -30,21 +35,27 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $nomor_transaksi = generateNomorTransaksi($_POST['tipe_transaksi']);
                 $tanggal_transaksi = sanitizeInput($_POST['tanggal_transaksi']);
                 $kategori_id = (int)$_POST['kategori_id'];
+                $pegawai_id = isset($_POST['pegawai_id']) && !empty($_POST['pegawai_id']) ? (int)$_POST['pegawai_id'] : null;
                 $tipe_transaksi = sanitizeInput($_POST['tipe_transaksi']);
-                $jumlah = (float)$_POST['jumlah'];
+                
+                // PERBAIKI INPUT JUMLAH - HAPUS FORMAT SEPARATOR
+                $jumlah_input = str_replace(['.', ','], '', $_POST['jumlah']); // Hapus separator
+                $jumlah = (float)$jumlah_input;
+                
                 $keterangan = sanitizeInput($_POST['keterangan']);
                 
                 if($jumlah <= 0) {
                     $error = 'Jumlah harus lebih dari 0!';
                 } else {
                     try {
-                        $query = "INSERT INTO transaksi_kas (nomor_transaksi, tanggal_transaksi, kategori_id, tipe_transaksi, jumlah, keterangan, user_id) 
-                                 VALUES (:nomor_transaksi, :tanggal_transaksi, :kategori_id, :tipe_transaksi, :jumlah, :keterangan, :user_id)";
+                        $query = "INSERT INTO transaksi_kas (nomor_transaksi, tanggal_transaksi, kategori_id, pegawai_id, tipe_transaksi, jumlah, keterangan, user_id) 
+                                 VALUES (:nomor_transaksi, :tanggal_transaksi, :kategori_id, :pegawai_id, :tipe_transaksi, :jumlah, :keterangan, :user_id)";
                         
                         $stmt = $db->prepare($query);
                         $stmt->bindParam(":nomor_transaksi", $nomor_transaksi);
                         $stmt->bindParam(":tanggal_transaksi", $tanggal_transaksi);
                         $stmt->bindParam(":kategori_id", $kategori_id);
+                        $stmt->bindParam(":pegawai_id", $pegawai_id);
                         $stmt->bindParam(":tipe_transaksi", $tipe_transaksi);
                         $stmt->bindParam(":jumlah", $jumlah);
                         $stmt->bindParam(":keterangan", $keterangan);
@@ -87,6 +98,12 @@ $stmt_categories = $db->prepare($query_categories);
 $stmt_categories->execute();
 $categories = $stmt_categories->fetchAll(PDO::FETCH_ASSOC);
 
+// Get employees for dropdown
+$query_employees = "SELECT id, nama_lengkap, departemen FROM pegawai WHERE is_active = 1 ORDER BY nama_lengkap";
+$stmt_employees = $db->prepare($query_employees);
+$stmt_employees->execute();
+$employees = $stmt_employees->fetchAll(PDO::FETCH_ASSOC);
+
 // Get transactions with pagination
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 20;
@@ -100,9 +117,11 @@ $query_transactions = "SELECT
     t.jumlah,
     t.keterangan,
     k.nama_kategori,
+    p.nama_lengkap as pegawai_nama,
     u.nama_lengkap as user_name
 FROM transaksi_kas t
 JOIN kategori_transaksi k ON t.kategori_id = k.id
+LEFT JOIN pegawai p ON t.pegawai_id = p.id
 JOIN users u ON t.user_id = u.id
 ORDER BY t.created_at DESC
 LIMIT :limit OFFSET :offset";
@@ -177,6 +196,10 @@ $total_pages = ceil($total_transactions / $limit);
                         <i class="fas fa-tags mr-3"></i>
                         Kategori
                     </a>
+                    <a href="pegawai.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
+                        <i class="fas fa-user-tie mr-3"></i>
+                        Pegawai
+                    </a>
                     <?php if($user['role'] === 'admin'): ?>
                     <a href="users.php" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
                         <i class="fas fa-users mr-3"></i>
@@ -236,15 +259,23 @@ $total_pages = ceil($total_transactions / $limit);
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
-                        <select name="kategori_id" id="kategori_select" required
+                        <select name="kategori_id" id="kategori_select" required onchange="checkKategoriBulanan(this.value)"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <option value="">Pilih Kategori</option>
                         </select>
                     </div>
                     
+                    <div id="pegawai_field" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Pegawai</label>
+                        <select name="pegawai_id" id="pegawai_select"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Pilih Pegawai</option>
+                        </select>
+                    </div>
+                    
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah (Rp)</label>
-                        <input type="number" name="jumlah" required min="0" step="0.01"
+                        <input type="text" name="jumlah" id="jumlah_input" required
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                placeholder="0">
                     </div>
@@ -280,6 +311,7 @@ $total_pages = ceil($total_transactions / $limit);
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. Transaksi</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pegawai</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
@@ -289,7 +321,7 @@ $total_pages = ceil($total_transactions / $limit);
                         <tbody class="bg-white divide-y divide-gray-200">
                             <?php if(empty($transactions)): ?>
                                 <tr>
-                                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">Belum ada transaksi</td>
+                                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">Belum ada transaksi</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach($transactions as $transaction): ?>
@@ -302,6 +334,9 @@ $total_pages = ceil($total_transactions / $limit);
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             <?php echo htmlspecialchars($transaction['nama_kategori']); ?>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <?php echo $transaction['pegawai_nama'] ? htmlspecialchars($transaction['pegawai_nama']) : '-'; ?>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
@@ -370,8 +405,9 @@ $total_pages = ceil($total_transactions / $limit);
     </div>
 
     <script>
-        // Store categories data
+        // Store categories and employees data
         const categories = <?php echo json_encode($categories); ?>;
+        const employees = <?php echo json_encode($employees); ?>;
         
         function filterCategories(tipe) {
             const kategoriSelect = document.getElementById('kategori_select');
@@ -386,15 +422,78 @@ $total_pages = ceil($total_transactions / $limit);
                     kategoriSelect.appendChild(option);
                 });
             }
+            
+            // Reset pegawai field when changing transaction type
+            document.getElementById('pegawai_field').classList.add('hidden');
+            document.getElementById('pegawai_select').value = '';
         }
         
-        // Auto-format number input
-        document.querySelector('input[name="jumlah"]').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/[^\d]/g, '');
-            if(value) {
-                value = parseInt(value).toLocaleString('id-ID');
-                e.target.value = value;
+        function checkKategoriBulanan(kategoriId) {
+            const pegawaiField = document.getElementById('pegawai_field');
+            const pegawaiSelect = document.getElementById('pegawai_select');
+            
+            // Find the selected category
+            const selectedCategory = categories.find(cat => cat.id == kategoriId);
+            
+            if (selectedCategory && selectedCategory.nama_kategori === 'Kas Bulanan Pegawai') {
+                // Show pegawai field and populate with employees
+                pegawaiField.classList.remove('hidden');
+                pegawaiSelect.innerHTML = '<option value="">Pilih Pegawai</option>';
+                
+                employees.forEach(emp => {
+                    const option = document.createElement('option');
+                    option.value = emp.id;
+                    option.textContent = `${emp.nama_lengkap} - ${emp.departemen}`;
+                    pegawaiSelect.appendChild(option);
+                });
+                
+                // Make pegawai field required
+                pegawaiSelect.required = true;
+            } else {
+                // Hide pegawai field
+                pegawaiField.classList.add('hidden');
+                pegawaiSelect.value = '';
+                pegawaiSelect.required = false;
             }
+        }
+        
+        // PERBAIKAN AUTO-FORMAT NUMBER INPUT
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+        
+        function parseNumber(str) {
+            return str.replace(/\./g, '');
+        }
+        
+        // Event listener untuk format input jumlah
+        document.getElementById('jumlah_input').addEventListener('input', function(e) {
+            let value = e.target.value;
+            
+            // Hapus semua karakter non-digit
+            value = value.replace(/[^\d]/g, '');
+            
+            if (value) {
+                // Format dengan titik sebagai thousand separator
+                e.target.value = formatNumber(value);
+            } else {
+                e.target.value = '';
+            }
+        });
+        
+        // Pastikan form mengirim nilai yang benar (tanpa separator)
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const jumlahInput = document.getElementById('jumlah_input');
+            const rawValue = parseNumber(jumlahInput.value);
+            
+            if (!rawValue || rawValue === '0') {
+                e.preventDefault();
+                alert('Jumlah harus diisi dan lebih dari 0!');
+                return false;
+            }
+            
+            // Set nilai mentah untuk dikirim ke server
+            jumlahInput.value = rawValue;
         });
     </script>
 </body>
