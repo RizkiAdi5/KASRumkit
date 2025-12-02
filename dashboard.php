@@ -48,6 +48,16 @@ $stmt_month->bindParam(":month", $month);
 $stmt_month->execute();
 $month_stats = $stmt_month->fetch(PDO::FETCH_ASSOC);
 
+// Total transactions (Saldo Akhir)
+$query_total = "SELECT 
+    COALESCE(SUM(CASE WHEN tipe_transaksi = 'pemasukan' THEN jumlah ELSE 0 END), 0) as total_pemasukan,
+    COALESCE(SUM(CASE WHEN tipe_transaksi = 'pengeluaran' THEN jumlah ELSE 0 END), 0) as total_pengeluaran
+FROM transaksi_kas";
+
+$stmt_total = $db->prepare($query_total);
+$stmt_total->execute();
+$total_stats = $stmt_total->fetch(PDO::FETCH_ASSOC);
+
 // Recent transactions
 $query_recent = "SELECT 
     t.nomor_transaksi,
@@ -72,6 +82,7 @@ $recent_transactions = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
 // Calculate balances
 $saldo_hari_ini = $today_stats['total_pemasukan_hari'] - $today_stats['total_pengeluaran_hari'];
 $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_pengeluaran_bulan'];
+$saldo_akhir = $total_stats['total_pemasukan'] - $total_stats['total_pengeluaran'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -154,7 +165,7 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
             </div>
 
             <!-- Statistics Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                 <!-- Today's Income -->
                 <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
                     <div class="flex items-center">
@@ -206,6 +217,21 @@ $saldo_bulan_ini = $month_stats['total_pemasukan_bulan'] - $month_stats['total_p
                             <p class="text-sm font-medium text-gray-600">Saldo Bulan Ini</p>
                             <p class="text-2xl font-bold <?php echo $saldo_bulan_ini >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
                                 <?php echo formatRupiah(abs($saldo_bulan_ini)); ?>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Saldo Akhir -->
+                <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-indigo-100 text-indigo-600">
+                            <i class="fas fa-coins text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Saldo Akhir</p>
+                            <p class="text-2xl font-bold <?php echo $saldo_akhir >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
+                                <?php echo formatRupiah(abs($saldo_akhir)); ?>
                             </p>
                         </div>
                     </div>

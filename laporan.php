@@ -20,8 +20,8 @@ $user = [
 ];
 
 // Get filter parameters
-$bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('Y-m');
-$tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
+$from_date = isset($_GET['from_date']) ? $_GET['from_date'] : date('Y-m-01');
+$to_date = isset($_GET['to_date']) ? $_GET['to_date'] : date('Y-m-d');
 $kategori_id = isset($_GET['kategori_id']) ? (int)$_GET['kategori_id'] : 0;
 $tipe = isset($_GET['tipe']) ? $_GET['tipe'] : '';
 
@@ -35,9 +35,14 @@ $categories = $stmt_categories->fetchAll(PDO::FETCH_ASSOC);
 $where_conditions = [];
 $params = [];
 
-if($bulan) {
-    $where_conditions[] = "DATE_FORMAT(t.tanggal_transaksi, '%Y-%m') = :bulan";
-    $params[':bulan'] = $bulan;
+if($from_date) {
+    $where_conditions[] = "DATE(t.tanggal_transaksi) >= :from_date";
+    $params[':from_date'] = $from_date;
+}
+
+if($to_date) {
+    $where_conditions[] = "DATE(t.tanggal_transaksi) <= :to_date";
+    $params[':to_date'] = $to_date;
 }
 
 if($kategori_id > 0) {
@@ -95,32 +100,66 @@ $stmt_count->execute();
 $total_transactions = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
 $total_pages = ceil($total_transactions / $limit);
 
-// Calculate summary
-$total_pemasukan = 0;
-$total_pengeluaran = 0;
-$saldo = 0;
+// Calculate summary (based on all filtered transactions, not just current page)
+$query_summary = "SELECT 
+    COALESCE(SUM(CASE WHEN t.tipe_transaksi = 'pemasukan' THEN t.jumlah ELSE 0 END), 0) as total_pemasukan,
+    COALESCE(SUM(CASE WHEN t.tipe_transaksi = 'pengeluaran' THEN t.jumlah ELSE 0 END), 0) as total_pengeluaran
+FROM transaksi_kas t
+JOIN kategori_transaksi k ON t.kategori_id = k.id
+JOIN users u ON t.user_id = u.id
+$where_clause";
 
-foreach($transactions as $transaction) {
-    if($transaction['tipe_transaksi'] === 'pemasukan') {
-        $total_pemasukan += $transaction['jumlah'];
-    } else {
-        $total_pengeluaran += $transaction['jumlah'];
-    }
+$stmt_summary = $db->prepare($query_summary);
+foreach($params as $key => $value) {
+    $stmt_summary->bindValue($key, $value);
 }
+$stmt_summary->execute();
+$summary_stats = $stmt_summary->fetch(PDO::FETCH_ASSOC);
+
+$total_pemasukan = $summary_stats['total_pemasukan'];
+$total_pengeluaran = $summary_stats['total_pengeluaran'];
 $saldo = $total_pemasukan - $total_pengeluaran;
 
-// Get monthly data for chart
+// Calculate total balance (Saldo Akhir) from all transactions
+$query_total = "SELECT 
+    COALESCE(SUM(CASE WHEN tipe_transaksi = 'pemasukan' THEN jumlah ELSE 0 END), 0) as total_pemasukan,
+    COALESCE(SUM(CASE WHEN tipe_transaksi = 'pengeluaran' THEN jumlah ELSE 0 END), 0) as total_pengeluaran
+FROM transaksi_kas";
+
+$stmt_total = $db->prepare($query_total);
+$stmt_total->execute();
+$total_stats = $stmt_total->fetch(PDO::FETCH_ASSOC);
+$saldo_akhir = $total_stats['total_pemasukan'] - $total_stats['total_pengeluaran'];
+
+// Get monthly data for chart (based on date range)
+$query_monthly_where = [];
+$monthly_params = [];
+
+if($from_date) {
+    $query_monthly_where[] = "DATE(tanggal_transaksi) >= :monthly_from_date";
+    $monthly_params[':monthly_from_date'] = $from_date;
+}
+
+if($to_date) {
+    $query_monthly_where[] = "DATE(tanggal_transaksi) <= :monthly_to_date";
+    $monthly_params[':monthly_to_date'] = $to_date;
+}
+
+$monthly_where_clause = !empty($query_monthly_where) ? "WHERE " . implode(" AND ", $query_monthly_where) : "";
+
 $query_monthly = "SELECT 
     DATE_FORMAT(tanggal_transaksi, '%Y-%m') as bulan,
     SUM(CASE WHEN tipe_transaksi = 'pemasukan' THEN jumlah ELSE 0 END) as pemasukan,
     SUM(CASE WHEN tipe_transaksi = 'pengeluaran' THEN jumlah ELSE 0 END) as pengeluaran
 FROM transaksi_kas 
-WHERE DATE_FORMAT(tanggal_transaksi, '%Y') = :tahun
+$monthly_where_clause
 GROUP BY DATE_FORMAT(tanggal_transaksi, '%Y-%m')
 ORDER BY bulan";
 
 $stmt_monthly = $db->prepare($query_monthly);
-$stmt_monthly->bindParam(":tahun", $tahun);
+foreach($monthly_params as $key => $value) {
+    $stmt_monthly->bindValue($key, $value);
+}
 $stmt_monthly->execute();
 $monthly_data = $stmt_monthly->fetchAll(PDO::FETCH_ASSOC);
 
@@ -229,21 +268,15 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
                 
                 <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Bulan</label>
-                        <input type="month" name="bulan" value="<?php echo $bulan; ?>"
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Dari Tanggal</label>
+                        <input type="date" name="from_date" value="<?php echo $from_date; ?>"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Tahun</label>
-                        <select name="tahun" 
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <?php for($y = date('Y'); $y >= date('Y')-5; $y--): ?>
-                                <option value="<?php echo $y; ?>" <?php echo $tahun == $y ? 'selected' : ''; ?>>
-                                    <?php echo $y; ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Sampai Tanggal</label>
+                        <input type="date" name="to_date" value="<?php echo $to_date; ?>"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     </div>
                     
                     <div>
@@ -289,7 +322,7 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
             </div>
 
             <!-- Summary Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
                     <div class="flex items-center">
                         <div class="p-3 rounded-full bg-green-100 text-green-600">
@@ -320,9 +353,23 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
                             <i class="fas fa-wallet text-xl"></i>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Saldo</p>
+                            <p class="text-sm font-medium text-gray-600">Saldo (Filter)</p>
                             <p class="text-2xl font-bold <?php echo $saldo >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
                                 <?php echo formatRupiah(abs($saldo)); ?>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-indigo-100 text-indigo-600">
+                            <i class="fas fa-coins text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Saldo Akhir</p>
+                            <p class="text-2xl font-bold <?php echo $saldo_akhir >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
+                                <?php echo formatRupiah(abs($saldo_akhir)); ?>
                             </p>
                         </div>
                     </div>
@@ -333,7 +380,7 @@ $category_summary = $stmt_category_summary->fetchAll(PDO::FETCH_ASSOC);
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <!-- Monthly Chart -->
                 <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-lg font-medium text-gray-800 mb-4">Grafik Bulanan <?php echo $tahun; ?></h3>
+                    <h3 class="text-lg font-medium text-gray-800 mb-4">Grafik Bulanan</h3>
                     <canvas id="monthlyChart" width="400" height="200"></canvas>
                 </div>
 

@@ -12,8 +12,8 @@ $database = new Database();
 $db = $database->getConnection();
 
 // Get filter parameters
-$bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('Y-m');
-$tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
+$from_date = isset($_GET['from_date']) ? $_GET['from_date'] : date('Y-m-01');
+$to_date = isset($_GET['to_date']) ? $_GET['to_date'] : date('Y-m-d');
 $kategori_id = isset($_GET['kategori_id']) ? (int)$_GET['kategori_id'] : 0;
 $tipe = isset($_GET['tipe']) ? $_GET['tipe'] : '';
 
@@ -21,9 +21,14 @@ $tipe = isset($_GET['tipe']) ? $_GET['tipe'] : '';
 $where_conditions = [];
 $params = [];
 
-if($bulan) {
-    $where_conditions[] = "DATE_FORMAT(t.tanggal_transaksi, '%Y-%m') = :bulan";
-    $params[':bulan'] = $bulan;
+if($from_date) {
+    $where_conditions[] = "DATE(t.tanggal_transaksi) >= :from_date";
+    $params[':from_date'] = $from_date;
+}
+
+if($to_date) {
+    $where_conditions[] = "DATE(t.tanggal_transaksi) <= :to_date";
+    $params[':to_date'] = $to_date;
 }
 
 if($kategori_id > 0) {
@@ -72,19 +77,36 @@ foreach($categories as $cat) {
     $categories_lookup[$cat['id']] = $cat['nama_kategori'];
 }
 
-// Calculate summary
-$total_pemasukan = 0;
-$total_pengeluaran = 0;
-$saldo = 0;
+// Calculate summary (based on all filtered transactions)
+$query_summary = "SELECT 
+    COALESCE(SUM(CASE WHEN t.tipe_transaksi = 'pemasukan' THEN t.jumlah ELSE 0 END), 0) as total_pemasukan,
+    COALESCE(SUM(CASE WHEN t.tipe_transaksi = 'pengeluaran' THEN t.jumlah ELSE 0 END), 0) as total_pengeluaran
+FROM transaksi_kas t
+JOIN kategori_transaksi k ON t.kategori_id = k.id
+JOIN users u ON t.user_id = u.id
+$where_clause";
 
-foreach($transactions as $transaction) {
-    if($transaction['tipe_transaksi'] === 'pemasukan') {
-        $total_pemasukan += $transaction['jumlah'];
-    } else {
-        $total_pengeluaran += $transaction['jumlah'];
-    }
+$stmt_summary = $db->prepare($query_summary);
+foreach($params as $key => $value) {
+    $stmt_summary->bindValue($key, $value);
 }
+$stmt_summary->execute();
+$summary_stats = $stmt_summary->fetch(PDO::FETCH_ASSOC);
+
+$total_pemasukan = $summary_stats['total_pemasukan'];
+$total_pengeluaran = $summary_stats['total_pengeluaran'];
 $saldo = $total_pemasukan - $total_pengeluaran;
+
+// Calculate total balance (Saldo Akhir) from all transactions
+$query_total = "SELECT 
+    COALESCE(SUM(CASE WHEN tipe_transaksi = 'pemasukan' THEN jumlah ELSE 0 END), 0) as total_pemasukan,
+    COALESCE(SUM(CASE WHEN tipe_transaksi = 'pengeluaran' THEN jumlah ELSE 0 END), 0) as total_pengeluaran
+FROM transaksi_kas";
+
+$stmt_total = $db->prepare($query_total);
+$stmt_total->execute();
+$total_stats = $stmt_total->fetch(PDO::FETCH_ASSOC);
+$saldo_akhir = $total_stats['total_pemasukan'] - $total_stats['total_pengeluaran'];
 
 // Set headers for Excel download
 $filename = "Laporan_Keuangan_" . date('Y-m-d_H-i-s') . ".xls";
@@ -110,17 +132,17 @@ header('Cache-Control: max-age=0');
 </head>
 <body>
     <h1>LAPORAN KEUANGAN</h1>
-    <h2>Periode: <?php echo date('F Y', strtotime($bulan . '-01')); ?></h2>
+    <h2>Periode: <?php echo date('d/m/Y', strtotime($from_date)); ?> - <?php echo date('d/m/Y', strtotime($to_date)); ?></h2>
     
     <!-- Filter Info -->
     <table style="margin-bottom: 20px; border: none;">
         <tr>
-            <td style="border: none;"><strong>Bulan:</strong></td>
-            <td style="border: none;"><?php echo date('F Y', strtotime($bulan . '-01')); ?></td>
+            <td style="border: none;"><strong>Dari Tanggal:</strong></td>
+            <td style="border: none;"><?php echo date('d/m/Y', strtotime($from_date)); ?></td>
         </tr>
         <tr>
-            <td style="border: none;"><strong>Tahun:</strong></td>
-            <td style="border: none;"><?php echo $tahun; ?></td>
+            <td style="border: none;"><strong>Sampai Tanggal:</strong></td>
+            <td style="border: none;"><?php echo date('d/m/Y', strtotime($to_date)); ?></td>
         </tr>
         <?php if($kategori_id > 0): ?>
         <tr>
@@ -142,13 +164,17 @@ header('Cache-Control: max-age=0');
         <tr class="summary">
             <th>Total Pemasukan</th>
             <th>Total Pengeluaran</th>
-            <th>Saldo</th>
+            <th>Saldo (Filter)</th>
+            <th>Saldo Akhir</th>
         </tr>
         <tr>
             <td class="pemasukan"><?php echo formatRupiah($total_pemasukan); ?></td>
             <td class="pengeluaran"><?php echo formatRupiah($total_pengeluaran); ?></td>
             <td class="<?php echo $saldo >= 0 ? 'pemasukan' : 'pengeluaran'; ?>">
                 <?php echo formatRupiah(abs($saldo)); ?>
+            </td>
+            <td class="<?php echo $saldo_akhir >= 0 ? 'pemasukan' : 'pengeluaran'; ?>">
+                <?php echo formatRupiah(abs($saldo_akhir)); ?>
             </td>
         </tr>
     </table>
@@ -206,7 +232,7 @@ header('Cache-Control: max-age=0');
     </table>
     
     <!-- Monthly Data -->
-    <h3>Data Bulanan <?php echo $tahun; ?></h3>
+    <h3>Data Bulanan</h3>
     <table style="margin-bottom: 20px;">
         <thead>
             <tr>
@@ -218,19 +244,33 @@ header('Cache-Control: max-age=0');
         </thead>
         <tbody>
             <?php
-            // Get monthly data for export
+            // Get monthly data for export (based on date range)
+            $query_monthly_where = [];
+            $monthly_params = [];
+
+            if($from_date) {
+                $query_monthly_where[] = "DATE(tanggal_transaksi) >= :monthly_from_date";
+                $monthly_params[':monthly_from_date'] = $from_date;
+            }
+
+            if($to_date) {
+                $query_monthly_where[] = "DATE(tanggal_transaksi) <= :monthly_to_date";
+                $monthly_params[':monthly_to_date'] = $to_date;
+            }
+
+            $monthly_where_clause = !empty($query_monthly_where) ? "WHERE " . implode(" AND ", $query_monthly_where) : "";
+
             $query_monthly = "SELECT 
                 DATE_FORMAT(tanggal_transaksi, '%Y-%m') as bulan,
                 SUM(CASE WHEN tipe_transaksi = 'pemasukan' THEN jumlah ELSE 0 END) as pemasukan,
                 SUM(CASE WHEN tipe_transaksi = 'pengeluaran' THEN jumlah ELSE 0 END) as pengeluaran
-            FROM transaksi_kas t
-            JOIN kategori_transaksi k ON t.kategori_id = k.id
-            $where_clause
+            FROM transaksi_kas 
+            $monthly_where_clause
             GROUP BY DATE_FORMAT(tanggal_transaksi, '%Y-%m')
             ORDER BY bulan";
             
             $stmt_monthly = $db->prepare($query_monthly);
-            foreach($params as $key => $value) {
+            foreach($monthly_params as $key => $value) {
                 $stmt_monthly->bindValue($key, $value);
             }
             $stmt_monthly->execute();
