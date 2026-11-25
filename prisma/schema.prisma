@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  KASIR
+}
+
+enum TipeTransaksi {
+  PEMASUKAN
+  PENGELUARAN
+}
+
+model User {
+  id           Int         @id @default(autoincrement())
+  username     String      @unique
+  passwordHash String
+  namaLengkap  String
+  email        String      @unique
+  role         Role        @default(KASIR)
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  transaksi    Transaksi[]
+  koperasiTransaksi KoperasiTransaksi[]
+
+  @@map("users")
+}
+
+model Kategori {
+  id               Int           @id @default(autoincrement())
+  namaKategori     String
+  tipe             TipeTransaksi
+  deskripsi        String?
+  isActive         Boolean       @default(true)
+  isPegawaiBulanan Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  transaksi        Transaksi[]
+
+  @@map("kategori_transaksi")
+}
+
+model Pegawai {
+  id          Int         @id @default(autoincrement())
+  namaLengkap String
+  departemen  String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  transaksi   Transaksi[]
+
+  @@map("pegawai")
+}
+
+model Transaksi {
+  id               Int           @id @default(autoincrement())
+  nomorTransaksi   String        @unique
+  tanggalTransaksi DateTime      @db.Date
+  kategoriId       Int
+  kategori         Kategori      @relation(fields: [kategoriId], references: [id])
+  tipeTransaksi    TipeTransaksi
+  jumlah           Decimal       @db.Decimal(15, 2)
+  keterangan       String?
+  userId           Int
+  user             User          @relation(fields: [userId], references: [id])
+  pegawaiId        Int?
+  pegawai          Pegawai?      @relation(fields: [pegawaiId], references: [id])
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@map("transaksi_kas")
+}
+
+// Koperasi Ruang — toko mini (jual snack dkk), pembukuan terpisah dari kas utama.
+// Sengaja tanpa stok/qty (stock opname): produk cuma label buat transaksi, bukan inventaris.
+model KoperasiProduk {
+  id         Int                 @id @default(autoincrement())
+  namaProduk String
+  hargaJual  Decimal?            @db.Decimal(15, 2)
+  isActive   Boolean             @default(true)
+  createdAt  DateTime            @default(now())
+  transaksi  KoperasiTransaksi[]
+
+  @@map("koperasi_produk")
+}
+
+model KoperasiTransaksi {
+  id               Int             @id @default(autoincrement())
+  nomorTransaksi   String          @unique
+  tanggalTransaksi DateTime        @db.Date
+  tipeTransaksi    TipeTransaksi
+  produkId         Int?
+  produk           KoperasiProduk? @relation(fields: [produkId], references: [id])
+  jumlah           Decimal         @db.Decimal(15, 2)
+  keterangan       String?
+  userId           Int
+  user             User            @relation(fields: [userId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@map("koperasi_transaksi")
+}

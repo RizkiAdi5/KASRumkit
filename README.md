@@ -1,270 +1,57 @@
-# KAS RUMKIT - Sistem Pengaturan Kas Rumah Sakit
+# KAS Ruang Gelatik — Sistem Kas Rumah Sakit
 
-Sistem pengaturan kas rumah sakit yang dibangun dengan PHP Native dan Tailwind CSS untuk manajemen transaksi keuangan yang efisien dan aman.
+Next.js rewrite of the original PHP app (kept for reference in `legacy-php/`). Cash transaction ledger for a hospital: pemasukan/pengeluaran tracking, category & employee master data, reporting with Excel export, and role-based access control.
 
-## 🚀 Fitur Utama
+## Stack
 
-### 🔐 Autentikasi & Keamanan
+- Next.js 16 (App Router, TypeScript, Server Actions)
+- Prisma 6 + PostgreSQL
+- Auth.js (NextAuth v5) — credentials login, JWT sessions
+- Tailwind CSS v4
+- recharts (monthly chart), sonner (toasts), exceljs (real `.xlsx` export)
 
-- Login sistem dengan role-based access control
-- Password hashing menggunakan bcrypt
-- Session management yang aman
-- Role: Admin, Supervisor, dan Kasir
+## Local setup
 
-### 💰 Manajemen Transaksi
+1. `npm install`
+2. Point `DATABASE_URL` in `.env` at a Postgres database (a throwaway local one works fine: `docker run -d -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=kas_rumkit -p 5433:5432 postgres:16`, then `DATABASE_URL="postgresql://postgres:postgres@localhost:5433/kas_rumkit?schema=public"`).
+3. `npx prisma migrate dev` — creates the schema.
+4. `npx prisma db seed` — creates the admin user and default categories.
+5. `npm run dev` — http://localhost:3000
 
-- Input transaksi pemasukan dan pengeluaran
-- Kategori transaksi yang dapat dikustomisasi
-- Nomor transaksi otomatis
-- Validasi input yang ketat
+Default login: **admin / admin123** (change this immediately in a real deployment, via the Pengguna page or directly in the database).
 
-### 📊 Dashboard & Laporan
+## Deploying (Vercel + Neon/Supabase)
 
-- Dashboard real-time dengan statistik keuangan
-- Laporan transaksi dengan filter (bulan, tahun, kategori)
-- Grafik bulanan pemasukan vs pengeluaran
-- Ringkasan kategori transaksi
+1. Create a Postgres database on Neon or Supabase, copy its connection string.
+2. Push this repo to GitHub, import it into Vercel.
+3. Set environment variables in Vercel: `DATABASE_URL`, `NEXTAUTH_SECRET` (any random 32+ char string — `openssl rand -base64 32`), `NEXTAUTH_URL` (your production URL).
+4. Vercel runs `npm run build`; run `npx prisma migrate deploy` once against the production database (locally, with `DATABASE_URL` pointed at prod, or via a one-off Vercel deploy hook) before first use, then `npx prisma db seed` for the initial admin account.
 
-### 🏷️ Manajemen Kategori
+## Roles
 
-- Tambah, edit, dan hapus kategori transaksi
-- Tipe kategori: Pemasukan dan Pengeluaran
-- Status aktif/nonaktif kategori
+| Page | Admin | Supervisor | Kasir |
+|---|---|---|---|
+| Dashboard | ✓ | ✓ | ✓ |
+| Transaksi — input | ✓ | ✓ | ✓ |
+| Transaksi — lihat/hapus | semua | semua | **milik sendiri** |
+| Laporan + Export Excel | ✓ | ✓ | ✗ |
+| Kategori | ✓ | ✓ | ✗ |
+| Pegawai | ✓ | ✓ | ✗ |
+| Pengguna | ✓ | ✗ | ✗ |
 
-### 👥 Manajemen Pengguna (Admin Only)
+## Notable differences from the old PHP app
 
-- Tambah, edit, dan hapus user
-- Ubah password user
-- Manajemen role dan status user
+- Real role enforcement (the PHP version only gated the Users page; everything else was open to any logged-in user regardless of role).
+- "Kas Bulanan Pegawai" is now a boolean flag on the category (`isPegawaiBulanan`) instead of matching the category name string in three different places.
+- Excel export is a genuine `.xlsx` file (the PHP version was an HTML table renamed `.xls`).
+- `saldo_kas` table dropped — it existed in the old schema but was never read or written anywhere.
+- Money uses Prisma `Decimal` instead of PHP floats.
 
-## 🛠️ Teknologi yang Digunakan
+## Not included
 
-- **Backend**: PHP 7.4+ (Native)
-- **Database**: MySQL 5.7+
-- **Frontend**: HTML5, Tailwind CSS, JavaScript
-- **Icons**: Font Awesome 6.0
-- **Charts**: Chart.js
-- **Server**: Apache/Nginx dengan XAMPP
+- No automated migration of existing MySQL data into the new Postgres schema. If production data needs to be carried over, that's a one-off export/import script to write separately.
+- No password reset, rate limiting, or CSRF tokens — none existed in the original app either; add if needed.
 
-## 📋 Persyaratan Sistem
+## Known transitive dependency advisories
 
-- PHP 7.4 atau lebih tinggi
-- MySQL 5.7 atau lebih tinggi
-- Web server (Apache/Nginx)
-- Browser modern dengan JavaScript enabled
-
-## 🚀 Cara Install
-
-### 1. Clone atau Download Proyek
-
-```bash
-git clone [repository-url]
-cd KASRumkit
-```
-
-### 2. Setup Database
-
-1. Buka phpMyAdmin atau MySQL client
-2. Buat database baru bernama `kas_rumkit`
-3. Import file `database/kas_rumkit.sql`
-
-### 3. Konfigurasi Database
-
-1. Edit file `config/database.php`
-2. Sesuaikan konfigurasi database:
-   ```php
-   private $host = 'localhost';
-   private $db_name = 'kas_rumkit';
-   private $username = 'root';        // Sesuaikan dengan username MySQL Anda
-   private $password = '';            // Sesuaikan dengan password MySQL Anda
-   ```
-
-### 4. Setup Web Server
-
-1. Pastikan XAMPP sudah terinstall dan running
-2. Copy folder proyek ke `htdocs/`
-3. Akses melalui browser: `http://localhost/KASRumkit`
-
-### 5. Login Default
-
-- **Username**: `admin`
-- **Password**: `admin123`
-
-## 📁 Struktur Folder
-
-```
-KASRumkit/
-├── config/
-│   └── database.php          # Konfigurasi database dan helper functions
-├── auth/
-│   └── auth.php              # Class autentikasi dan session management
-├── database/
-│   └── kas_rumkit.sql        # Script SQL untuk setup database
-├── login.php                 # Halaman login
-├── dashboard.php             # Dashboard utama
-├── transaksi.php             # Manajemen transaksi
-├── laporan.php               # Laporan keuangan
-├── kategori.php              # Manajemen kategori
-├── users.php                 # Manajemen pengguna (admin only)
-├── logout.php                # Script logout
-└── README.md                 # Dokumentasi ini
-```
-
-## 🔧 Konfigurasi
-
-### Database Configuration
-
-File `config/database.php` berisi:
-
-- Konfigurasi koneksi database
-- Helper functions untuk format rupiah
-- Helper functions untuk generate nomor transaksi
-- Helper functions untuk validasi dan security
-
-### Security Features
-
-- Password hashing dengan bcrypt
-- Prepared statements untuk mencegah SQL injection
-- Input sanitization
-- Session timeout protection
-
-## 📱 Penggunaan
-
-### 1. Login
-
-- Akses halaman login
-- Masukkan username dan password
-- Sistem akan redirect ke dashboard
-
-### 2. Dashboard
-
-- Lihat statistik keuangan hari ini dan bulan ini
-- Monitor transaksi terbaru
-- Navigasi ke menu lainnya
-
-### 3. Transaksi
-
-- Tambah transaksi baru (pemasukan/pengeluaran)
-- Pilih kategori dan tanggal
-- Input jumlah dan keterangan
-- Lihat daftar semua transaksi
-
-### 4. Laporan
-
-- Filter laporan berdasarkan bulan, tahun, kategori
-- Lihat grafik bulanan
-- Export data transaksi
-
-### 5. Kategori
-
-- Kelola kategori transaksi
-- Tambah kategori baru
-- Edit atau hapus kategori yang ada
-
-### 6. Users (Admin Only)
-
-- Tambah user baru
-- Edit informasi user
-- Ubah password user
-- Hapus user
-
-## 🔒 Role dan Permission
-
-### Admin
-
-- Akses penuh ke semua fitur
-- Manajemen user
-- Manajemen kategori
-- Lihat semua transaksi
-
-### Supervisor
-
-- Akses ke dashboard, transaksi, laporan, dan kategori
-- Tidak bisa mengelola user
-- Lihat semua transaksi
-
-### Kasir
-
-- Akses ke dashboard dan transaksi
-- Input transaksi baru
-- Lihat transaksi yang dibuat sendiri
-
-## 📊 Database Schema
-
-### Tables
-
-1. **users** - Data pengguna sistem
-2. **kategori_transaksi** - Kategori transaksi
-3. **transaksi_kas** - Data transaksi keuangan
-4. **saldo_kas** - Saldo kas harian
-
-### Relationships
-
-- `transaksi_kas.kategori_id` → `kategori_transaksi.id`
-- `transaksi_kas.user_id` → `users.id`
-
-## 🚨 Troubleshooting
-
-### Error Koneksi Database
-
-- Pastikan MySQL service running
-- Cek konfigurasi database di `config/database.php`
-- Pastikan database `kas_rumkit` sudah dibuat
-
-### Error Login
-
-- Pastikan tabel `users` sudah ter-import
-- Cek username dan password default
-- Pastikan session PHP berfungsi
-
-### Error Permission
-
-- Pastikan folder memiliki permission write
-- Cek error log Apache/PHP
-
-## 🔄 Update dan Maintenance
-
-### Backup Database
-
-```bash
-mysqldump -u root -p kas_rumkit > backup_kas_rumkit.sql
-```
-
-### Update System
-
-1. Backup database dan file
-2. Replace file yang diupdate
-3. Import perubahan database jika ada
-4. Test sistem
-
-## 📞 Support
-
-Untuk bantuan dan support:
-
-- Buat issue di repository
-- Hubungi developer team
-- Dokumentasi lengkap tersedia di code
-
-## 📄 License
-
-Proyek ini dibuat untuk keperluan internal rumah sakit. Dilarang menggunakan untuk komersial tanpa izin.
-
-## 🎯 Roadmap
-
-### Versi 1.1 (Coming Soon)
-
-- [ ] Export laporan ke PDF/Excel
-- [ ] Notifikasi email untuk transaksi besar
-- [ ] Mobile responsive design
-- [ ] API endpoints untuk integrasi
-
-### Versi 1.2 (Future)
-
-- [ ] Multi-currency support
-- [ ] Advanced reporting
-- [ ] Audit trail
-- [ ] Backup otomatis
-
----
-
-**Dibuat dengan ❤️ untuk efisiensi manajemen keuangan rumah sakit**
+`npm audit` flags a handful of moderate/high advisories in transitive dependencies of `prisma` (CLI-only, not bundled in the running app) and `exceljs`'s `uuid` dependency. Fixing them requires a breaking major-version bump of those packages; left as-is for now since none are exploitable in this app's actual usage. Re-check with `npm audit` before a production deploy and decide whether to take the breaking upgrade at that point.
